@@ -16,6 +16,7 @@ namespace FIXPVENDS
         // Session-level persistence for parameters
         private static double _lastOffset = 7.5;
         private static double _lastTextHeight = 2.5;
+        private static string _lastValueType = "Station";
 
         [CommandMethod("FIXPVENDS")]
         public void FixProfileViewEnds()
@@ -47,7 +48,20 @@ namespace FIXPVENDS
                         return;
                     }
 
-                    // 3. User Parameters for placement (Persistent)
+                    // 3. Mode Selection (Station vs Elevation)
+                    PromptKeywordOptions pko = new PromptKeywordOptions("\nSelect value type to insert [Station/Elevation]: ");
+                    pko.Keywords.Add("Station");
+                    pko.Keywords.Add("Elevation");
+                    pko.Keywords.Default = _lastValueType;
+                    pko.AllowNone = true;
+
+                    PromptResult pr = ed.GetKeywords(pko);
+                    if (pr.Status == PromptStatus.OK)
+                    {
+                        _lastValueType = pr.StringResult;
+                    }
+
+                    // 4. User Parameters for placement (Persistent)
                     PromptDoubleOptions pdoOffset = new PromptDoubleOptions("\nEnter vertical offset from grid bottom: ");
                     pdoOffset.DefaultValue = _lastOffset;
                     pdoOffset.UseDefaultValue = true;
@@ -66,24 +80,51 @@ namespace FIXPVENDS
                         _lastTextHeight = pdrHeight.Value;
                     }
 
-                    // 4. Calculate Coordinates (X, Y)
+                    // 5. Calculate Values to Insert
                     double startStation = alignment.StartingStation;
                     double endStation = alignment.EndingStation;
-                    double targetElevation = pv.ElevationMin - _lastOffset;
+                    string startText = "";
+                    string endText = "";
 
+                    if (_lastValueType == "Station")
+                    {
+                        startText = startStation.ToString("0.000");
+                        endText = endStation.ToString("0.000");
+                    }
+                    else // Elevation
+                    {
+                        Profile groundProfile = null;
+                        foreach (ObjectId profileId in alignment.GetProfileIds())
+                        {
+                            Profile p = tr.GetObject(profileId, OpenMode.ForRead) as Profile;
+                            if (p != null) { groundProfile = p; break; }
+                        }
+
+                        if (groundProfile == null)
+                        {
+                            ed.WriteMessage("\nError: No Profile found for this Alignment.");
+                            return;
+                        }
+
+                        startText = groundProfile.ElevationAt(startStation).ToString("0.000");
+                        endText = groundProfile.ElevationAt(endStation).ToString("0.000");
+                    }
+
+                    // 6. Calculate Coordinates (X, Y)
+                    double targetElevation = pv.ElevationMin - _lastOffset;
                     double xStart = 0, yStart = 0;
                     double xEnd = 0, yEnd = 0;
 
                     pv.FindXYAtStationAndElevation(startStation, targetElevation, ref xStart, ref yStart);
                     pv.FindXYAtStationAndElevation(endStation, targetElevation, ref xEnd, ref yEnd);
 
-                    // 5. Create MText Objects
+                    // 7. Create MText Objects
                     BlockTableRecord btr = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
 
-                    // --- START STATION ---
+                    // --- START ---
                     using (MText mtStart = new MText())
                     {
-                        mtStart.Contents = startStation.ToString("0.000");
+                        mtStart.Contents = startText;
                         mtStart.Location = new Point3d(xStart, yStart, 0);
                         mtStart.TextHeight = _lastTextHeight;
                         mtStart.Rotation = Math.PI / 2.0; // 90 Degrees
@@ -93,10 +134,10 @@ namespace FIXPVENDS
                         tr.AddNewlyCreatedDBObject(mtStart, true);
                     }
 
-                    // --- END STATION ---
+                    // --- END ---
                     using (MText mtEnd = new MText())
                     {
-                        mtEnd.Contents = endStation.ToString("0.000");
+                        mtEnd.Contents = endText;
                         mtEnd.Location = new Point3d(xEnd, yEnd, 0);
                         mtEnd.TextHeight = _lastTextHeight;
                         mtEnd.Rotation = Math.PI / 2.0; // 90 Degrees
@@ -106,7 +147,7 @@ namespace FIXPVENDS
                         tr.AddNewlyCreatedDBObject(mtEnd, true);
                     }
 
-                    ed.WriteMessage($"\nSuccessfully inserted MText values {startStation:F3} and {endStation:F3} into the band.");
+                    ed.WriteMessage($"\nSuccessfully inserted {_lastValueType} values {startText} and {endText} into the band.");
                     tr.Commit();
                 }
                 catch (System.Exception ex)

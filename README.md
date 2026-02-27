@@ -10,8 +10,9 @@ The `FIXPVENDS` command bypasses these issues by "literally inserting" native Au
 
 ## Features
 - **Auto-Coordinate Calculation**: Automatically finds the correct (X, Y) position for start/end stations.
-- **Persistent Settings**: Remembers your last used **Vertical Offset** and **Text Height** during the session.
-- **Clean Output**: Inserts only the station value (e.g., `0.000`) at a 90-degree rotation.
+- **Persistent Settings**: Remembers your last used **Value Type**, **Vertical Offset**, and **Text Height** during the session.
+- **Data Modes**: Choose between **Station** (Chainage) or **Elevation** (from the Ground Profile) to fill different band types like "Existing Levels".
+- **Clean Output**: Inserts only the value (e.g., `0.000`) at a 90-degree rotation.
 
 ## Installation
 1. Open the project in Visual Studio or use the command line.
