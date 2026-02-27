@@ -13,6 +13,10 @@ namespace FIXPVENDS
 {
     public class FixPvEndsCmd
     {
+        // Session-level persistence for parameters
+        private static double _lastOffset = 7.5;
+        private static double _lastTextHeight = 2.5;
+
         [CommandMethod("FIXPVENDS")]
         public void FixProfileViewEnds()
         {
@@ -43,24 +47,29 @@ namespace FIXPVENDS
                         return;
                     }
 
-                    // 3. User Parameters for placement
-                    PromptDoubleOptions pdoOffset = new PromptDoubleOptions("\nEnter vertical offset from grid bottom (e.g. 7.5): ");
-                    pdoOffset.DefaultValue = 7.5;
+                    // 3. User Parameters for placement (Persistent)
+                    PromptDoubleOptions pdoOffset = new PromptDoubleOptions("\nEnter vertical offset from grid bottom: ");
+                    pdoOffset.DefaultValue = _lastOffset;
                     pdoOffset.UseDefaultValue = true;
                     PromptDoubleResult pdrOffset = ed.GetDouble(pdoOffset);
-                    double vOffset = (pdrOffset.Status == PromptStatus.OK) ? pdrOffset.Value : 7.5;
+                    if (pdrOffset.Status == PromptStatus.OK)
+                    {
+                        _lastOffset = pdrOffset.Value;
+                    }
 
-                    PromptDoubleOptions pdoHeight = new PromptDoubleOptions("\nEnter text height (e.g. 2.5): ");
-                    pdoHeight.DefaultValue = 2.5;
+                    PromptDoubleOptions pdoHeight = new PromptDoubleOptions("\nEnter text height: ");
+                    pdoHeight.DefaultValue = _lastTextHeight;
                     pdoHeight.UseDefaultValue = true;
                     PromptDoubleResult pdrHeight = ed.GetDouble(pdoHeight);
-                    double textHeight = (pdrHeight.Status == PromptStatus.OK) ? pdrHeight.Value : 2.5;
+                    if (pdrHeight.Status == PromptStatus.OK)
+                    {
+                        _lastTextHeight = pdrHeight.Value;
+                    }
 
                     // 4. Calculate Coordinates (X, Y)
-                    // We find the exact X,Y in drawing space for the start/end stations
                     double startStation = alignment.StartingStation;
                     double endStation = alignment.EndingStation;
-                    double targetElevation = pv.ElevationMin - vOffset;
+                    double targetElevation = pv.ElevationMin - _lastOffset;
 
                     double xStart = 0, yStart = 0;
                     double xEnd = 0, yEnd = 0;
@@ -68,7 +77,7 @@ namespace FIXPVENDS
                     pv.FindXYAtStationAndElevation(startStation, targetElevation, ref xStart, ref yStart);
                     pv.FindXYAtStationAndElevation(endStation, targetElevation, ref xEnd, ref yEnd);
 
-                    // 5. Create MText Objects (The "Literal" Insertion)
+                    // 5. Create MText Objects
                     BlockTableRecord btr = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
 
                     // --- START STATION ---
@@ -76,7 +85,7 @@ namespace FIXPVENDS
                     {
                         mtStart.Contents = startStation.ToString("0.000");
                         mtStart.Location = new Point3d(xStart, yStart, 0);
-                        mtStart.TextHeight = textHeight;
+                        mtStart.TextHeight = _lastTextHeight;
                         mtStart.Rotation = Math.PI / 2.0; // 90 Degrees
                         mtStart.Attachment = AttachmentPoint.MiddleCenter;
                         
@@ -89,7 +98,7 @@ namespace FIXPVENDS
                     {
                         mtEnd.Contents = endStation.ToString("0.000");
                         mtEnd.Location = new Point3d(xEnd, yEnd, 0);
-                        mtEnd.TextHeight = textHeight;
+                        mtEnd.TextHeight = _lastTextHeight;
                         mtEnd.Rotation = Math.PI / 2.0; // 90 Degrees
                         mtEnd.Attachment = AttachmentPoint.MiddleCenter;
 
